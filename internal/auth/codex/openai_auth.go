@@ -131,10 +131,12 @@ func (o *CodexAuth) ExchangeCodeForTokens(ctx context.Context, code string, pkce
 	accountID := ""
 	email := ""
 	orgID := ""
+	var orgs []Organizations
 	if claims != nil {
 		accountID = claims.GetAccountID()
 		email = claims.GetUserEmail()
 		orgID, _ = claims.GetDefaultOrganization()
+		orgs = claims.CodexAuthInfo.Organizations
 	}
 
 	// Create token data
@@ -144,6 +146,7 @@ func (o *CodexAuth) ExchangeCodeForTokens(ctx context.Context, code string, pkce
 		RefreshToken:   tokenResp.RefreshToken,
 		AccountID:      accountID,
 		OrganizationID: orgID,
+		Organizations:  orgs,
 		Email:          email,
 		Expire:         time.Now().Add(time.Duration(tokenResp.ExpiresIn) * time.Second).Format(time.RFC3339),
 	}
@@ -218,10 +221,12 @@ func (o *CodexAuth) RefreshTokens(ctx context.Context, refreshToken string) (*Co
 	accountID := ""
 	email := ""
 	orgID := ""
+	var orgs []Organizations
 	if claims != nil {
 		accountID = claims.GetAccountID()
 		email = claims.Email
 		orgID, _ = claims.GetDefaultOrganization()
+		orgs = claims.CodexAuthInfo.Organizations
 	}
 
 	return &CodexTokenData{
@@ -230,6 +235,7 @@ func (o *CodexAuth) RefreshTokens(ctx context.Context, refreshToken string) (*Co
 		RefreshToken:   tokenResp.RefreshToken,
 		AccountID:      accountID,
 		OrganizationID: orgID,
+		Organizations:  orgs,
 		Email:          email,
 		Expire:         time.Now().Add(time.Duration(tokenResp.ExpiresIn) * time.Second).Format(time.RFC3339),
 	}, nil
@@ -244,6 +250,7 @@ func (o *CodexAuth) CreateTokenStorage(bundle *CodexAuthBundle) *CodexTokenStora
 		RefreshToken:   bundle.TokenData.RefreshToken,
 		AccountID:      bundle.TokenData.AccountID,
 		OrganizationID: bundle.TokenData.OrganizationID,
+		Organizations:  bundle.TokenData.Organizations,
 		LastRefresh:    bundle.LastRefresh,
 		Email:          bundle.TokenData.Email,
 		Expire:         bundle.TokenData.Expire,
@@ -288,6 +295,7 @@ func (o *CodexAuth) UpdateTokenStorage(storage *CodexTokenStorage, tokenData *Co
 	storage.RefreshToken = tokenData.RefreshToken
 	storage.AccountID = tokenData.AccountID
 	storage.OrganizationID = tokenData.OrganizationID
+	storage.Organizations = tokenData.Organizations
 	storage.LastRefresh = time.Now().Format(time.RFC3339)
 	storage.Email = tokenData.Email
 	storage.Expire = tokenData.Expire

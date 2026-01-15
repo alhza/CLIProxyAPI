@@ -27,6 +27,8 @@ type CodexTokenStorage struct {
 	AccountID string `json:"account_id"`
 	// OrganizationID is the selected OpenAI organization identifier.
 	OrganizationID string `json:"organization_id"`
+	// Organizations contains all organizations available to the account.
+	Organizations []Organizations `json:"organizations,omitempty"`
 	// LastRefresh is the timestamp of the last token refresh operation.
 	LastRefresh string `json:"last_refresh"`
 	// Email is the OpenAI account email address associated with this token.

@@ -1385,10 +1385,12 @@ func (h *Handler) RequestCodexToken(c *gin.Context) {
 		accountID := ""
 		orgID := ""
 		orgTitle := ""
+		var orgs []codex.Organizations
 		if claims != nil {
 			email = claims.GetUserEmail()
 			accountID = claims.GetAccountID()
 			orgID, orgTitle = claims.GetDefaultOrganization()
+			orgs = claims.CodexAuthInfo.Organizations
 		}
 		// Build bundle compatible with existing storage
 		bundle := &codex.CodexAuthBundle{
@@ -1398,6 +1400,7 @@ func (h *Handler) RequestCodexToken(c *gin.Context) {
 				RefreshToken:   tokenResp.RefreshToken,
 				AccountID:      accountID,
 				OrganizationID: orgID,
+				Organizations:  orgs,
 				Email:          email,
 				Expire:         time.Now().Add(time.Duration(tokenResp.ExpiresIn) * time.Second).Format(time.RFC3339),
 			},
@@ -1417,6 +1420,7 @@ func (h *Handler) RequestCodexToken(c *gin.Context) {
 				"account_id":         tokenStorage.AccountID,
 				"organization_id":    tokenStorage.OrganizationID,
 				"organization_title": strings.TrimSpace(orgTitle),
+				"organizations":      orgs,
 			},
 		}
 		savedPath, errSave := h.saveTokenRecord(ctx, record)

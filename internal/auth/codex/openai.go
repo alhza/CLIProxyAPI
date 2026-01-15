@@ -23,6 +23,8 @@ type CodexTokenData struct {
 	AccountID string `json:"account_id"`
 	// OrganizationID is the selected OpenAI organization identifier
 	OrganizationID string `json:"organization_id"`
+	// Organizations contains all organizations available to the account.
+	Organizations []Organizations `json:"organizations,omitempty"`
 	// Email is the OpenAI account email
 	Email string `json:"email"`
 	// Expire is the timestamp of the token expire

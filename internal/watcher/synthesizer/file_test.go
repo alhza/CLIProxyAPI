@@ -450,6 +450,108 @@ func TestSynthesizeGeminiVirtualAuths_NilPrimaryAttributes(t *testing.T) {
 	}
 }
 
+func TestSynthesizeCodexVirtualAuths_NilInputs(t *testing.T) {
+	now := time.Now()
+
+	if SynthesizeCodexVirtualAuths(nil, nil, now) != nil {
+		t.Error("expected nil for nil primary")
+	}
+	if SynthesizeCodexVirtualAuths(&coreauth.Auth{}, nil, now) != nil {
+		t.Error("expected nil for nil metadata")
+	}
+	if SynthesizeCodexVirtualAuths(nil, map[string]any{}, now) != nil {
+		t.Error("expected nil for nil primary with metadata")
+	}
+}
+
+func TestSynthesizeCodexVirtualAuths_SingleOrg(t *testing.T) {
+	now := time.Now()
+	primary := &coreauth.Auth{
+		ID:       "primary-id",
+		Provider: "codex",
+		Label:    "test@example.com",
+	}
+	metadata := map[string]any{
+		"type":          "codex",
+		"email":         "test@example.com",
+		"organizations": []map[string]any{{"id": "org-alpha", "title": "Alpha", "is_default": true}},
+	}
+
+	virtuals := SynthesizeCodexVirtualAuths(primary, metadata, now)
+	if virtuals != nil {
+		t.Error("single organization should not create virtuals")
+	}
+}
+
+func TestSynthesizeCodexVirtualAuths_MultiOrg(t *testing.T) {
+	now := time.Now()
+	primary := &coreauth.Auth{
+		ID:       "primary-id",
+		Provider: "codex",
+		Label:    "test@example.com",
+		Prefix:   "team",
+		ProxyURL: "http://proxy.local",
+		Attributes: map[string]string{
+			"source": "test-source",
+			"path":   "/path/to/auth",
+		},
+	}
+	metadata := map[string]any{
+		"type":         "codex",
+		"email":        "test@example.com",
+		"access_token": "token",
+		"organizations": []map[string]any{
+			{"id": "org-alpha", "title": "Alpha", "is_default": true},
+			{"id": "org-beta", "title": "Beta"},
+		},
+	}
+
+	virtuals := SynthesizeCodexVirtualAuths(primary, metadata, now)
+	if len(virtuals) != 2 {
+		t.Fatalf("expected 2 virtuals, got %d", len(virtuals))
+	}
+
+	if !primary.Disabled {
+		t.Error("expected primary to be disabled")
+	}
+	if primary.Status != coreauth.StatusDisabled {
+		t.Errorf("expected primary status disabled, got %s", primary.Status)
+	}
+	if primary.Attributes["codex_virtual_primary"] != "true" {
+		t.Error("expected codex_virtual_primary=true")
+	}
+	if !strings.Contains(primary.Attributes["virtual_children"], "org-alpha") {
+		t.Error("expected virtual_children to contain org-alpha")
+	}
+
+	for _, v := range virtuals {
+		if v.Provider != "codex" {
+			t.Errorf("expected provider codex, got %s", v.Provider)
+		}
+		if v.Status != coreauth.StatusActive {
+			t.Errorf("expected status active, got %s", v.Status)
+		}
+		if v.ProxyURL != "http://proxy.local" {
+			t.Errorf("expected proxy_url http://proxy.local, got %s", v.ProxyURL)
+		}
+		if v.Attributes["runtime_only"] != "true" {
+			t.Error("expected runtime_only=true")
+		}
+		if v.Attributes["codex_virtual_parent"] != "primary-id" {
+			t.Errorf("expected codex_virtual_parent=primary-id, got %s", v.Attributes["codex_virtual_parent"])
+		}
+		if v.Attributes["header:OpenAI-Organization"] == "" {
+			t.Error("expected OpenAI-Organization header to be set")
+		}
+		if v.Metadata == nil {
+			t.Error("expected metadata copy")
+		}
+		if v.Prefix == "" || !strings.HasPrefix(v.Prefix, "team-") {
+			t.Errorf("expected prefix to start with team-, got %s", v.Prefix)
+		}
+	}
+}
+
 func TestSplitGeminiProjectIDs(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -504,6 +606,71 @@ func TestSplitGeminiProjectIDs(t *testing.T) {
 					t.Errorf("expected %v, got %v", tt.want, got)
 					break
 				}
+			}
+		})
+	}
+}
+
+func TestFileSynthesizer_Synthesize_MultiOrgCodex(t *testing.T) {
+	tempDir := t.TempDir()
+
+	authData := map[string]any{
+		"type":  "codex",
+		"email": "multi@example.com",
+		"organizations": []map[string]any{
+			{"id": "org-alpha", "title": "Alpha", "is_default": true},
+			{"id": "org-beta", "title": "Beta"},
+		},
+	}
+	data, _ := json.Marshal(authData)
+	err := os.WriteFile(filepath.Join(tempDir, "codex-multi.json"), data, 0644)
+	if err != nil {
+		t.Fatalf("failed to write auth file: %v", err)
+	}
+
+	synth := NewFileSynthesizer()
+	ctx := &SynthesisContext{
+		Config:      &config.Config{},
+		AuthDir:     tempDir,
+		Now:         time.Now(),
+		IDGenerator: NewStableIDGenerator(),
+	}
+
+	auths, err := synth.Synthesize(ctx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(auths) != 3 {
+		t.Fatalf("expected 3 auths (1 primary + 2 virtuals), got %d", len(auths))
+	}
+	if !auths[0].Disabled {
+		t.Error("expected primary to be disabled")
+	}
+	for i := 1; i < 3; i++ {
+		if auths[i].Attributes["codex_virtual_parent"] != auths[0].ID {
+			t.Errorf("expected virtual %d parent to be %s, got %s", i, auths[0].ID, auths[i].Attributes["codex_virtual_parent"])
+		}
+	}
+}
+
+func TestBuildCodexVirtualID(t *testing.T) {
+	tests := []struct {
+		name  string
+		base  string
+		orgID string
+		want  string
+	}{
+		{"basic", "auth.json", "org-alpha", "auth.json::org-alpha"},
+		{"with slashes", "auth.json", "org/alpha", "auth.json::org_alpha"},
+		{"with spaces", "auth.json", "org alpha", "auth.json::org_alpha"},
+		{"empty org", "auth.json", "", "auth.json::org"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := buildCodexVirtualID(tt.base, tt.orgID)
+			if got != tt.want {
+				t.Errorf("expected %q, got %q", tt.want, got)
 			}
 		})
 	}

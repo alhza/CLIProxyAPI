@@ -198,6 +198,9 @@ waitForCallback:
 	if v := strings.TrimSpace(tokenStorage.OrganizationID); v != "" {
 		metadata["organization_id"] = v
 	}
+	if len(tokenStorage.Organizations) > 0 {
+		metadata["organizations"] = tokenStorage.Organizations
+	}
 
 	fmt.Println("Codex authentication successful")
 	if authBundle.APIKey != "" {
