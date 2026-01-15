@@ -201,6 +201,12 @@ waitForCallback:
 	if len(tokenStorage.Organizations) > 0 {
 		metadata["organizations"] = tokenStorage.Organizations
 	}
+	if opts.Metadata != nil {
+		if v := strings.TrimSpace(opts.Metadata["organization_ids"]); v != "" {
+			tokenStorage.OrganizationIDs = v
+			metadata["organization_ids"] = v
+		}
+	}
 
 	fmt.Println("Codex authentication successful")
 	if authBundle.APIKey != "" {

@@ -483,6 +483,46 @@ func TestSynthesizeCodexVirtualAuths_SingleOrg(t *testing.T) {
 	}
 }
 
+func TestExtractCodexOrganizations_Override(t *testing.T) {
+	metadata := map[string]any{
+		"organizations": []map[string]any{{"id": "org-alpha"}},
+		"organizations_override": []map[string]any{
+			{"id": "org-beta"},
+			{"id": "org-charlie", "is_default": true},
+		},
+	}
+
+	orgs := extractCodexOrganizations(metadata)
+	if len(orgs) != 2 {
+		t.Fatalf("expected 2 orgs, got %d", len(orgs))
+	}
+	if orgs[0].ID != "org-charlie" {
+		t.Errorf("expected default org first, got %s", orgs[0].ID)
+	}
+}
+
+func TestSynthesizeCodexVirtualAuths_OrganizationIDs(t *testing.T) {
+	now := time.Now()
+	primary := &coreauth.Auth{
+		ID:       "primary-id",
+		Provider: "codex",
+		Label:    "test@example.com",
+	}
+	metadata := map[string]any{
+		"type":             "codex",
+		"email":            "test@example.com",
+		"organization_ids": "org-alpha, org-beta",
+	}
+
+	virtuals := SynthesizeCodexVirtualAuths(primary, metadata, now)
+	if len(virtuals) != 2 {
+		t.Fatalf("expected 2 virtuals, got %d", len(virtuals))
+	}
+	if !primary.Disabled {
+		t.Error("expected primary to be disabled")
+	}
+}
+
 func TestSynthesizeCodexVirtualAuths_MultiOrg(t *testing.T) {
 	now := time.Now()
 	primary := &coreauth.Auth{

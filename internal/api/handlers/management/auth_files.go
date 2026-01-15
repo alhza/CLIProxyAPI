@@ -1250,6 +1250,11 @@ func (h *Handler) RequestCodexToken(c *gin.Context) {
 
 	fmt.Println("Initializing Codex authentication...")
 
+	orgIDs := strings.TrimSpace(c.Query("organization_ids"))
+	if orgIDs == "" {
+		orgIDs = strings.TrimSpace(c.Query("org_ids"))
+	}
+
 	// Generate PKCE codes
 	pkceCodes, err := codex.GeneratePKCECodes()
 	if err != nil {
@@ -1409,19 +1414,26 @@ func (h *Handler) RequestCodexToken(c *gin.Context) {
 
 		// Create token storage and persist
 		tokenStorage := openaiAuth.CreateTokenStorage(bundle)
+		if orgIDs != "" {
+			tokenStorage.OrganizationIDs = orgIDs
+		}
 		fileName := codex.BuildCodexAuthFileName(tokenStorage.Email, tokenStorage.OrganizationID)
+		metadata := map[string]any{
+			"email":              tokenStorage.Email,
+			"account_id":         tokenStorage.AccountID,
+			"organization_id":    tokenStorage.OrganizationID,
+			"organization_title": strings.TrimSpace(orgTitle),
+			"organizations":      orgs,
+		}
+		if orgIDs != "" {
+			metadata["organization_ids"] = orgIDs
+		}
 		record := &coreauth.Auth{
 			ID:       fileName,
 			Provider: "codex",
 			FileName: fileName,
 			Storage:  tokenStorage,
-			Metadata: map[string]any{
-				"email":              tokenStorage.Email,
-				"account_id":         tokenStorage.AccountID,
-				"organization_id":    tokenStorage.OrganizationID,
-				"organization_title": strings.TrimSpace(orgTitle),
-				"organizations":      orgs,
-			},
+			Metadata: metadata,
 		}
 		savedPath, errSave := h.saveTokenRecord(ctx, record)
 		if errSave != nil {

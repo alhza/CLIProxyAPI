@@ -302,24 +302,18 @@ func extractCodexOrganizations(metadata map[string]any) []codexOrganization {
 	if metadata == nil {
 		return nil
 	}
-	raw, ok := metadata["organizations"]
-	if !ok || raw == nil {
-		return nil
+	if orgs := parseCodexOrganizations(metadata["organizations_override"]); len(orgs) > 0 {
+		return orgs
 	}
+	if orgs := parseCodexOrganizations(metadata["organization_ids"]); len(orgs) > 0 {
+		return orgs
+	}
+	return parseCodexOrganizations(metadata["organizations"])
+}
 
-	seen := make(map[string]struct{})
-	orgs := make([]codexOrganization, 0, 4)
-	add := func(org codexOrganization) {
-		org.ID = strings.TrimSpace(org.ID)
-		if org.ID == "" {
-			return
-		}
-		key := strings.ToLower(org.ID)
-		if _, exists := seen[key]; exists {
-			return
-		}
-		seen[key] = struct{}{}
-		orgs = append(orgs, org)
+func parseCodexOrganizations(raw any) []codexOrganization {
+	if raw == nil {
+		return nil
 	}
 
 	var items []any
@@ -336,15 +330,52 @@ func extractCodexOrganizations(metadata map[string]any) []codexOrganization {
 		for _, item := range typed {
 			items = append(items, item)
 		}
+	case []string:
+		items = make([]any, 0, len(typed))
+		for _, item := range typed {
+			items = append(items, item)
+		}
+	case map[string]any:
+		items = []any{typed}
+	case map[string]string:
+		items = []any{typed}
 	case string:
-		if strings.TrimSpace(typed) == "" {
+		trimmed := strings.TrimSpace(typed)
+		if trimmed == "" {
 			return nil
 		}
-		if err := json.Unmarshal([]byte(typed), &items); err != nil {
-			return nil
+		if strings.HasPrefix(trimmed, "[") {
+			if err := json.Unmarshal([]byte(trimmed), &items); err == nil {
+				break
+			}
+		}
+		if strings.HasPrefix(trimmed, "{") {
+			var obj map[string]any
+			if err := json.Unmarshal([]byte(trimmed), &obj); err == nil {
+				items = []any{obj}
+				break
+			}
+		}
+		for _, part := range splitCodexOrgIDs(trimmed) {
+			items = append(items, part)
 		}
 	default:
 		return nil
+	}
+
+	seen := make(map[string]struct{})
+	orgs := make([]codexOrganization, 0, len(items))
+	add := func(org codexOrganization) {
+		org.ID = strings.TrimSpace(org.ID)
+		if org.ID == "" {
+			return
+		}
+		key := strings.ToLower(org.ID)
+		if _, exists := seen[key]; exists {
+			return
+		}
+		seen[key] = struct{}{}
+		orgs = append(orgs, org)
 	}
 
 	for _, item := range items {
@@ -374,18 +405,52 @@ func parseCodexOrganization(item any) (codexOrganization, bool) {
 	case map[string]any:
 		return codexOrganization{
 			ID:        stringValue(typed["id"]),
-			Title:     stringValue(typed["title"]),
-			IsDefault: boolValue(typed["is_default"]),
+			Title:     firstNonEmpty(stringValue(typed["title"]), stringValue(typed["name"])),
+			IsDefault: boolValue(typed["is_default"]) || boolValue(typed["isDefault"]) || boolValue(typed["default"]),
 		}, true
 	case map[string]string:
 		return codexOrganization{
-			ID:        strings.TrimSpace(typed["id"]),
-			Title:     strings.TrimSpace(typed["title"]),
-			IsDefault: strings.EqualFold(strings.TrimSpace(typed["is_default"]), "true"),
+			ID:    strings.TrimSpace(typed["id"]),
+			Title: firstNonEmpty(strings.TrimSpace(typed["title"]), strings.TrimSpace(typed["name"])),
+			IsDefault: strings.EqualFold(strings.TrimSpace(typed["is_default"]), "true") ||
+				strings.EqualFold(strings.TrimSpace(typed["isDefault"]), "true") ||
+				strings.EqualFold(strings.TrimSpace(typed["default"]), "true"),
 		}, true
+	case string:
+		id := strings.TrimSpace(typed)
+		if id == "" {
+			return codexOrganization{}, false
+		}
+		return codexOrganization{ID: id}, true
 	default:
 		return codexOrganization{}, false
 	}
+}
+
+func splitCodexOrgIDs(raw string) []string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	parts := strings.FieldsFunc(raw, func(r rune) bool {
+		return r == ',' || r == ';' || r == '\n' || r == '\t' || r == ' '
+	})
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			out = append(out, trimmed)
+		}
+	}
+	return out
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func buildCodexOrgPrefix(basePrefix, orgID string) string {

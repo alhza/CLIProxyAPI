@@ -29,6 +29,10 @@ type CodexTokenStorage struct {
 	OrganizationID string `json:"organization_id"`
 	// Organizations contains all organizations available to the account.
 	Organizations []Organizations `json:"organizations,omitempty"`
+	// OrganizationsOverride contains custom orgs used for virtual auth generation.
+	OrganizationsOverride []Organizations `json:"organizations_override,omitempty"`
+	// OrganizationIDs contains a comma-separated list of organization IDs for overrides.
+	OrganizationIDs string `json:"organization_ids,omitempty"`
 	// LastRefresh is the timestamp of the last token refresh operation.
 	LastRefresh string `json:"last_refresh"`
 	// Email is the OpenAI account email address associated with this token.
