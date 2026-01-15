@@ -542,6 +542,7 @@ func applyCodexHeaders(r *http.Request, auth *cliproxyauth.Auth, token string) {
 	misc.EnsureHeader(r.Header, ginHeaders, "Openai-Beta", "responses=experimental")
 	misc.EnsureHeader(r.Header, ginHeaders, "Session_id", uuid.NewString())
 	misc.EnsureHeader(r.Header, ginHeaders, "User-Agent", "codex_cli_rs/0.50.0 (Mac OS 26.0.1; arm64) Apple_Terminal/464")
+	misc.EnsureHeader(r.Header, ginHeaders, "OpenAI-Organization", "")
 
 	r.Header.Set("Accept", "text/event-stream")
 	r.Header.Set("Connection", "Keep-Alive")
