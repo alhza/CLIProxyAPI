@@ -130,19 +130,22 @@ func (o *CodexAuth) ExchangeCodeForTokens(ctx context.Context, code string, pkce
 
 	accountID := ""
 	email := ""
+	orgID := ""
 	if claims != nil {
 		accountID = claims.GetAccountID()
 		email = claims.GetUserEmail()
+		orgID, _ = claims.GetDefaultOrganization()
 	}
 
 	// Create token data
 	tokenData := CodexTokenData{
-		IDToken:      tokenResp.IDToken,
-		AccessToken:  tokenResp.AccessToken,
-		RefreshToken: tokenResp.RefreshToken,
-		AccountID:    accountID,
-		Email:        email,
-		Expire:       time.Now().Add(time.Duration(tokenResp.ExpiresIn) * time.Second).Format(time.RFC3339),
+		IDToken:        tokenResp.IDToken,
+		AccessToken:    tokenResp.AccessToken,
+		RefreshToken:   tokenResp.RefreshToken,
+		AccountID:      accountID,
+		OrganizationID: orgID,
+		Email:          email,
+		Expire:         time.Now().Add(time.Duration(tokenResp.ExpiresIn) * time.Second).Format(time.RFC3339),
 	}
 
 	// Create auth bundle
@@ -214,18 +217,21 @@ func (o *CodexAuth) RefreshTokens(ctx context.Context, refreshToken string) (*Co
 
 	accountID := ""
 	email := ""
+	orgID := ""
 	if claims != nil {
 		accountID = claims.GetAccountID()
 		email = claims.Email
+		orgID, _ = claims.GetDefaultOrganization()
 	}
 
 	return &CodexTokenData{
-		IDToken:      tokenResp.IDToken,
-		AccessToken:  tokenResp.AccessToken,
-		RefreshToken: tokenResp.RefreshToken,
-		AccountID:    accountID,
-		Email:        email,
-		Expire:       time.Now().Add(time.Duration(tokenResp.ExpiresIn) * time.Second).Format(time.RFC3339),
+		IDToken:        tokenResp.IDToken,
+		AccessToken:    tokenResp.AccessToken,
+		RefreshToken:   tokenResp.RefreshToken,
+		AccountID:      accountID,
+		OrganizationID: orgID,
+		Email:          email,
+		Expire:         time.Now().Add(time.Duration(tokenResp.ExpiresIn) * time.Second).Format(time.RFC3339),
 	}, nil
 }
 
@@ -233,13 +239,14 @@ func (o *CodexAuth) RefreshTokens(ctx context.Context, refreshToken string) (*Co
 // It populates the storage struct with token data, user information, and timestamps.
 func (o *CodexAuth) CreateTokenStorage(bundle *CodexAuthBundle) *CodexTokenStorage {
 	storage := &CodexTokenStorage{
-		IDToken:      bundle.TokenData.IDToken,
-		AccessToken:  bundle.TokenData.AccessToken,
-		RefreshToken: bundle.TokenData.RefreshToken,
-		AccountID:    bundle.TokenData.AccountID,
-		LastRefresh:  bundle.LastRefresh,
-		Email:        bundle.TokenData.Email,
-		Expire:       bundle.TokenData.Expire,
+		IDToken:        bundle.TokenData.IDToken,
+		AccessToken:    bundle.TokenData.AccessToken,
+		RefreshToken:   bundle.TokenData.RefreshToken,
+		AccountID:      bundle.TokenData.AccountID,
+		OrganizationID: bundle.TokenData.OrganizationID,
+		LastRefresh:    bundle.LastRefresh,
+		Email:          bundle.TokenData.Email,
+		Expire:         bundle.TokenData.Expire,
 	}
 
 	return storage
@@ -280,6 +287,7 @@ func (o *CodexAuth) UpdateTokenStorage(storage *CodexTokenStorage, tokenData *Co
 	storage.AccessToken = tokenData.AccessToken
 	storage.RefreshToken = tokenData.RefreshToken
 	storage.AccountID = tokenData.AccountID
+	storage.OrganizationID = tokenData.OrganizationID
 	storage.LastRefresh = time.Now().Format(time.RFC3339)
 	storage.Email = tokenData.Email
 	storage.Expire = tokenData.Expire

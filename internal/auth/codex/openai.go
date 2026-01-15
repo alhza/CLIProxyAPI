@@ -21,6 +21,8 @@ type CodexTokenData struct {
 	RefreshToken string `json:"refresh_token"`
 	// AccountID is the OpenAI account identifier
 	AccountID string `json:"account_id"`
+	// OrganizationID is the selected OpenAI organization identifier
+	OrganizationID string `json:"organization_id"`
 	// Email is the OpenAI account email
 	Email string `json:"email"`
 	// Expire is the timestamp of the token expire

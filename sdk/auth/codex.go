@@ -191,9 +191,12 @@ waitForCallback:
 		return nil, fmt.Errorf("codex token storage missing account information")
 	}
 
-	fileName := fmt.Sprintf("codex-%s.json", tokenStorage.Email)
+	fileName := codex.BuildCodexAuthFileName(tokenStorage.Email, tokenStorage.OrganizationID)
 	metadata := map[string]any{
 		"email": tokenStorage.Email,
+	}
+	if v := strings.TrimSpace(tokenStorage.OrganizationID); v != "" {
+		metadata["organization_id"] = v
 	}
 
 	fmt.Println("Codex authentication successful")

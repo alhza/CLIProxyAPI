@@ -1383,33 +1383,40 @@ func (h *Handler) RequestCodexToken(c *gin.Context) {
 		claims, _ := codex.ParseJWTToken(tokenResp.IDToken)
 		email := ""
 		accountID := ""
+		orgID := ""
+		orgTitle := ""
 		if claims != nil {
 			email = claims.GetUserEmail()
 			accountID = claims.GetAccountID()
+			orgID, orgTitle = claims.GetDefaultOrganization()
 		}
 		// Build bundle compatible with existing storage
 		bundle := &codex.CodexAuthBundle{
 			TokenData: codex.CodexTokenData{
-				IDToken:      tokenResp.IDToken,
-				AccessToken:  tokenResp.AccessToken,
-				RefreshToken: tokenResp.RefreshToken,
-				AccountID:    accountID,
-				Email:        email,
-				Expire:       time.Now().Add(time.Duration(tokenResp.ExpiresIn) * time.Second).Format(time.RFC3339),
+				IDToken:        tokenResp.IDToken,
+				AccessToken:    tokenResp.AccessToken,
+				RefreshToken:   tokenResp.RefreshToken,
+				AccountID:      accountID,
+				OrganizationID: orgID,
+				Email:          email,
+				Expire:         time.Now().Add(time.Duration(tokenResp.ExpiresIn) * time.Second).Format(time.RFC3339),
 			},
 			LastRefresh: time.Now().Format(time.RFC3339),
 		}
 
 		// Create token storage and persist
 		tokenStorage := openaiAuth.CreateTokenStorage(bundle)
+		fileName := codex.BuildCodexAuthFileName(tokenStorage.Email, tokenStorage.OrganizationID)
 		record := &coreauth.Auth{
-			ID:       fmt.Sprintf("codex-%s.json", tokenStorage.Email),
+			ID:       fileName,
 			Provider: "codex",
-			FileName: fmt.Sprintf("codex-%s.json", tokenStorage.Email),
+			FileName: fileName,
 			Storage:  tokenStorage,
 			Metadata: map[string]any{
-				"email":      tokenStorage.Email,
-				"account_id": tokenStorage.AccountID,
+				"email":              tokenStorage.Email,
+				"account_id":         tokenStorage.AccountID,
+				"organization_id":    tokenStorage.OrganizationID,
+				"organization_title": strings.TrimSpace(orgTitle),
 			},
 		}
 		savedPath, errSave := h.saveTokenRecord(ctx, record)

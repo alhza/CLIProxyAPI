@@ -100,3 +100,20 @@ func (c *JWTClaims) GetUserEmail() string {
 func (c *JWTClaims) GetAccountID() string {
 	return c.CodexAuthInfo.ChatgptAccountID
 }
+
+// GetDefaultOrganization returns the default organization ID and title if present.
+func (c *JWTClaims) GetDefaultOrganization() (string, string) {
+	if c == nil {
+		return "", ""
+	}
+	orgs := c.CodexAuthInfo.Organizations
+	for _, org := range orgs {
+		if org.IsDefault && strings.TrimSpace(org.ID) != "" {
+			return strings.TrimSpace(org.ID), strings.TrimSpace(org.Title)
+		}
+	}
+	if len(orgs) == 0 {
+		return "", ""
+	}
+	return strings.TrimSpace(orgs[0].ID), strings.TrimSpace(orgs[0].Title)
+}

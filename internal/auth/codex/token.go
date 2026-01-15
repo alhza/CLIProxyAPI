@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/misc"
 )
@@ -24,6 +25,8 @@ type CodexTokenStorage struct {
 	RefreshToken string `json:"refresh_token"`
 	// AccountID is the OpenAI account identifier associated with this token.
 	AccountID string `json:"account_id"`
+	// OrganizationID is the selected OpenAI organization identifier.
+	OrganizationID string `json:"organization_id"`
 	// LastRefresh is the timestamp of the last token refresh operation.
 	LastRefresh string `json:"last_refresh"`
 	// Email is the OpenAI account email address associated with this token.
@@ -63,4 +66,24 @@ func (ts *CodexTokenStorage) SaveTokenToFile(authFilePath string) error {
 	}
 	return nil
 
+}
+
+func sanitizeCodexFilePart(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	replacer := strings.NewReplacer("/", "_", "\\", "_", ":", "_")
+	return replacer.Replace(value)
+}
+
+// BuildCodexAuthFileName builds a stable filename for Codex OAuth credentials.
+// It falls back to the legacy email-only filename when organization is missing.
+func BuildCodexAuthFileName(email, organizationID string) string {
+	email = sanitizeCodexFilePart(email)
+	organizationID = sanitizeCodexFilePart(organizationID)
+	if organizationID == "" {
+		return fmt.Sprintf("codex-%s.json", email)
+	}
+	return fmt.Sprintf("codex-%s-%s.json", email, organizationID)
 }
